@@ -1,7 +1,17 @@
+import os
+
+from dotenv import load_dotenv
 from telethon import TelegramClient
 from telethon.tl.functions.messages import GetHistoryRequest
 from telethon.tl.types import InputPhotoFileLocation
 from telethon.utils import pack_bot_file_id
+
+load_dotenv()
+
+api_id = os.getenv("API_ID")
+api_hash = os.getenv("API_HASH")
+phone_number = os.getenv("PHONE_NUMBER")
+channel_username = os.getenv("CHANNEL_USERNAME")
 
 client = TelegramClient("session", api_id, api_hash)
 
