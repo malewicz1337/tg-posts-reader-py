@@ -1,10 +1,7 @@
 from telethon import TelegramClient
 from telethon.tl.functions.messages import GetHistoryRequest
-
-api_id = "<telegram-api-id>"
-api_hash = "<telegram-api-hash>"
-phone_number = "<phone-number>"
-channel_username = "<channel-username>"
+from telethon.tl.types import InputPhotoFileLocation
+from telethon.utils import pack_bot_file_id
 
 client = TelegramClient("session", api_id, api_hash)
 
@@ -26,7 +23,7 @@ async def main():
     limit = 100
     all_messages = []
     total_messages = 0
-    total_count_limit = 1000
+    total_count_limit = 10
 
     while True:
         print("Current Offset ID is:", offset_id, "; Total Messages:", total_messages)
@@ -56,14 +53,66 @@ async def main():
     print("Message structure:", all_messages[0].keys())
 
     for message in all_messages:
-        if "message" in message:
+        print(f"Message ID: {message.get('id', 'Unknown ID')}")
+
+        if "message" in message and message["message"]:
             print(f"Text: {message['message']}")
-        elif "media" in message:
-            print(f"Media: {message['media'].get('_', 'Unknown media type')}")
-        elif "action" in message:
-            print(f"Action: {message['action'].get('_', 'Unknown action type')}")
-        else:
-            print("This update contains neither text nor media.")
+
+        if "media" in message:
+            media = message["media"]
+            if isinstance(media, dict):
+                media_type = media.get("_", "Unknown media type")
+                print(f"Media Type: {media_type}")
+
+                if media_type == "MessageMediaPhoto":
+                    print("Photo detected")
+                    if "photo" in media and isinstance(media["photo"], dict):
+                        photo = media["photo"]
+                        photo_id = photo.get("id")
+                        photo_access_hash = photo.get("access_hash")
+                        photo_file_reference = photo.get("file_reference")
+
+                        print(f"Photo ID: {photo_id}")
+                        print(f"Access Hash: {photo_access_hash}")
+                        print(f"File Reference: {photo_file_reference}")
+
+                        file_id = pack_bot_file_id(
+                            InputPhotoFileLocation(
+                                id=photo_id,
+                                access_hash=photo_access_hash,
+                                file_reference=photo_file_reference,
+                                thumb_size="x",
+                            )
+                        )
+                        print(f"File ID: {file_id}")
+
+                        chat_id = message.get("peer_id", {}).get("channel_id")
+                        message_id = message.get("id")
+                        if chat_id and message_id:
+                            deep_link = f"https://t.me/c/{chat_id}/{message_id}"
+                            print(f"Telegram Deep Link: {deep_link}")
+                            public_link = f"https://t.me/c/{chat_id}/{message_id}"
+                            print(f"Public Telegram Link: {public_link}")
+                            user_friendly_link = (
+                                f"https://t.me/{channel_username}/{message_id}"
+                            )
+                            print(f"User-friendly Telegram Link: {user_friendly_link}")
+                            print(get_image_url(user_friendly_link))
+                        else:
+                            print(
+                                "Couldn't create deep link: chat_id or message_id not found"
+                            )
+
+                    else:
+                        print("Photo information not found in the expected structure")
+
+        if "action" in message:
+            if isinstance(message["action"], dict):
+                action_type = message["action"].get("_", "Unknown action type")
+                print(f"Action: {action_type}")
+            else:
+                print(f"Action: {message['action']}")
+
         print("-" * 50)
 
 
