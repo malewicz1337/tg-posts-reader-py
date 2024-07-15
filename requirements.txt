@@ -1,3 +1,6 @@
 telethon
 requests
 BeautifulSoup4
+selenium
+webdriver_manager
+python-dotenv
