@@ -15,8 +15,6 @@ api_hash = os.environ["API_HASH"]
 phone_number = os.environ["PHONE_NUMBER"]
 channel_username = os.environ["CHANNEL_USERNAME"]
 
-client = TelegramClient("session", api_id, api_hash)
-
 
 async def main():
     async with TelegramClient("session", api_id, api_hash) as client:
