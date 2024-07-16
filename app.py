@@ -1,87 +1,60 @@
+import asyncio
 import os
 
 from dotenv import load_dotenv
 from telethon import TelegramClient
-from telethon.tl.functions.messages import GetHistoryRequest
 from telethon.tl.types import InputPhotoFileLocation
 from telethon.utils import pack_bot_file_id
 
+from sel_scraper import get_telegram_image_url
+
 load_dotenv()
 
-api_id = os.getenv("API_ID")
-api_hash = os.getenv("API_HASH")
-phone_number = os.getenv("PHONE_NUMBER")
-channel_username = os.getenv("CHANNEL_USERNAME")
+api_id = os.environ["API_ID"]
+api_hash = os.environ["API_HASH"]
+phone_number = os.environ["PHONE_NUMBER"]
+channel_username = os.environ["CHANNEL_USERNAME"]
 
 client = TelegramClient("session", api_id, api_hash)
 
 
 async def main():
-    client.start()
+    async with TelegramClient("session", api_id, api_hash) as client:
+        channel_entity = await client.get_entity(channel_username)
+        all_messages = []
+        total_count_limit = 10
 
-    if not await client.is_user_authorized():
-        await client.send_code_request(phone_number)
-        try:
-            await client.sign_in(phone_number, input("Enter the code: "))
-        except Exception as e:
-            print(e)
-            await client.sign_in(password=input("Password: "))
-
-    channel_entity = await client.get_entity(channel_username)
-
-    offset_id = 0
-    limit = 100
-    all_messages = []
-    total_messages = 0
-    total_count_limit = 10
-
-    while True:
-        print("Current Offset ID is:", offset_id, "; Total Messages:", total_messages)
-        history = await client(
-            GetHistoryRequest(
-                peer=channel_entity,
-                offset_id=offset_id,
-                offset_date=None,
-                add_offset=0,
-                limit=limit,
-                max_id=0,
-                min_id=0,
-                hash=0,
-            )
-        )
-        if not history.messages:
-            break
-        messages = history.messages
-        for message in messages:
+        async for message in client.iter_messages(
+            channel_entity, limit=total_count_limit
+        ):
             all_messages.append(message.to_dict())
-        offset_id = messages[len(messages) - 1].id
+            print(f"Total Messages: {len(all_messages)}")
+
+            if len(all_messages) >= total_count_limit:
+                break
+
         total_messages = len(all_messages)
-        if total_count_limit is not None and total_messages >= total_count_limit:
-            break
+        print(f"Total messages retrieved: {total_messages}")
+        print("Message structure:", all_messages[0].keys())
 
-    print("Total messages:", total_messages)
-    print("Message structure:", all_messages[0].keys())
+        for message in all_messages:
+            print(f"Message ID: {message.get('id', 'Unknown ID')}")
 
-    for message in all_messages:
-        print(f"Message ID: {message.get('id', 'Unknown ID')}")
+            if message.get("message"):
+                print(f"Text: {message['message']}")
 
-        if "message" in message and message["message"]:
-            print(f"Text: {message['message']}")
-
-        if "media" in message:
-            media = message["media"]
+            media = message.get("media", {})
             if isinstance(media, dict):
                 media_type = media.get("_", "Unknown media type")
                 print(f"Media Type: {media_type}")
 
                 if media_type == "MessageMediaPhoto":
                     print("Photo detected")
-                    if "photo" in media and isinstance(media["photo"], dict):
-                        photo = media["photo"]
+                    photo = media.get("photo", {})
+                    if isinstance(photo, dict):
                         photo_id = photo.get("id")
                         photo_access_hash = photo.get("access_hash")
                         photo_file_reference = photo.get("file_reference")
-
                         print(f"Photo ID: {photo_id}")
                         print(f"Access Hash: {photo_access_hash}")
                         print(f"File Reference: {photo_file_reference}")
@@ -99,32 +72,33 @@ async def main():
                         chat_id = message.get("peer_id", {}).get("channel_id")
                         message_id = message.get("id")
                         if chat_id and message_id:
-                            deep_link = f"https://t.me/c/{chat_id}/{message_id}"
-                            print(f"Telegram Deep Link: {deep_link}")
-                            public_link = f"https://t.me/c/{chat_id}/{message_id}"
-                            print(f"Public Telegram Link: {public_link}")
-                            user_friendly_link = (
-                                f"https://t.me/{channel_username}/{message_id}"
+                            links = {
+                                "Deep Link": f"https://t.me/c/{chat_id}/{message_id}",
+                                "Public Link": f"https://t.me/{channel_username}/{message_id}",
+                            }
+                            for link_type, link in links.items():
+                                print(f"{link_type}: {link}")
+
+                            print(
+                                f"Image CDN URL: {get_telegram_image_url(links['Public Link'])}"
                             )
-                            print(f"User-friendly Telegram Link: {user_friendly_link}")
-                            print(get_image_url(user_friendly_link))
                         else:
                             print(
-                                "Couldn't create deep link: chat_id or message_id not found"
+                                "Couldn't create links: chat_id or message_id not found"
                             )
-
                     else:
                         print("Photo information not found in the expected structure")
 
-        if "action" in message:
-            if isinstance(message["action"], dict):
-                action_type = message["action"].get("_", "Unknown action type")
+            action = message.get("action")
+            if action:
+                action_type = (
+                    action.get("_", "Unknown action type")
+                    if isinstance(action, dict)
+                    else action
+                )
                 print(f"Action: {action_type}")
-            else:
-                print(f"Action: {message['action']}")
 
-        print("-" * 50)
+            print("-" * 50)
 
 
-with client:
-    client.loop.run_until_complete(main())
+asyncio.run(main())
